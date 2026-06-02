@@ -481,3 +481,6 @@ En conclusión, FastAPI combina simplicidad, validación robusta y documentació
 
 ---
 
+## Presentación en Video device_systems
+
+**Video:**  https://youtu.be/mkzmeL9gkE4?si=K_5rLnpY6PTPtQUw
