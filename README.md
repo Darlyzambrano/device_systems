@@ -1,24 +1,23 @@
-# device_systems – Fundamentos de FastAPI
+# device_systems API
 
-**Actividad:** GA1-220501096-01-AA1-EV07 – Fundamentos de FastAPI: API REST para Gestión de Usuarios
+**Actividad:** GA1-220501096-01-AA1-EV08 – FastAPI Intermedio: CRUD completo, manejo de errores, Swagger/OpenAPI y Dependency Injection
 
-API REST construida con **FastAPI** para la gestión de usuarios del sistema `device_systems`.
+**Rama:** `ev08` (EV07 permanece en `main`)
+
+API REST con **FastAPI** para gestión de usuarios: CRUD completo, capas separadas, `Depends()`, códigos HTTP y documentación OpenAPI.
 
 ---
 
-## Descripción de la aplicación
+## Descripción
 
-`device_systems` es una aplicación backend que expone un recurso `/users` para administrar usuarios del sistema. La API permite:
+`device_systems` evoluciona desde GET/POST hacia una API profesional que permite:
 
-- Listar todos los usuarios
-- Consultar un usuario por ID (Path Parameter)
-- Filtrar usuarios por rol o estado activo (Query Parameters)
-- Registrar nuevos usuarios con validación de datos
-- Evitar correos electrónicos duplicados
-- Retornar respuestas estandarizadas con `response_model`
-- Incluir cabeceras HTTP personalizadas en cada respuesta
-
-La documentación interactiva se genera automáticamente con **Swagger UI** al ejecutar el servidor.
+- Crear, listar, consultar, actualizar y eliminar usuarios
+- Filtrar por `role` e `is_active`
+- Validar datos con Pydantic v2
+- Manejar errores con `HTTPException`
+- Reutilizar lógica con **Dependency Injection**
+- Documentar endpoints en Swagger UI y ReDoc
 
 ---
 
@@ -26,11 +25,11 @@ La documentación interactiva se genera automáticamente con **Swagger UI** al e
 
 | Tecnología | Uso |
 |------------|-----|
-| Python 3.10+ | Lenguaje de programación |
-| FastAPI | Framework web para construir la API REST |
-| Uvicorn | Servidor ASGI para ejecutar la aplicación |
-| Pydantic v2 | Validación y serialización de datos |
-| Git / GitHub | Control de versiones y entrega del proyecto |
+| Python 3.10+ | Lenguaje |
+| FastAPI | Framework API REST |
+| Uvicorn | Servidor ASGI |
+| Pydantic v2 | Validación y serialización |
+| Git | Control de versiones (ramas `main` / `ev08`) |
 
 ---
 
@@ -39,82 +38,44 @@ La documentación interactiva se genera automáticamente con **Swagger UI** al e
 ```
 device_systems/
 ├── app/
-│   ├── main.py                 # Configuración inicial de FastAPI
+│   ├── main.py
+│   ├── routes/
+│   │   └── user_routes.py       # Endpoints HTTP (capa delgada)
 │   ├── schemas/
-│   │   └── user_schema.py      # Modelos Pydantic de entrada y salida
-│   └── routes/
-│       └── user_routes.py      # Endpoints GET y POST del recurso users
+│   │   └── user_schema.py       # Modelos Pydantic
+│   ├── services/
+│   │   └── user_service.py      # Lógica de negocio
+│   ├── dependencies/
+│   │   └── user_dependencies.py # Depends() reutilizables
+│   └── data/
+│       └── users_db.py          # Base de datos en memoria
 ├── requirements.txt
 └── README.md
 ```
 
-### Organización del código
-
-- **`main.py`**: Crea la instancia de FastAPI, registra las rutas y expone el endpoint raíz `/`.
-- **`user_schema.py`**: Define los modelos `UserCreate` (entrada) y `UserResponse` (salida) con validaciones Pydantic.
-- **`user_routes.py`**: Contiene los endpoints HTTP, la base de datos simulada en memoria y la lógica de filtrado.
-
----
-
-## Modelos Pydantic
-
-### UserCreate (entrada – POST)
-
-| Campo | Tipo | Validación |
-|-------|------|------------|
-| `name` | string | Obligatorio, mínimo 3 caracteres |
-| `email` | EmailStr | Formato de correo válido |
-| `role` | string | Solo valores permitidos: `admin`, `support`, `user` |
-| `is_active` | boolean | Valor booleano (por defecto `true`) |
-
-### UserResponse (salida – GET y POST)
-
-| Campo | Tipo | Descripción |
-|-------|------|-------------|
-| `id` | int | Identificador único del usuario |
-| `name` | string | Nombre del usuario |
-| `email` | string | Correo electrónico |
-| `role` | string | Rol en el sistema |
-| `is_active` | boolean | Estado activo/inactivo |
-
-El `response_model` garantiza que la API solo exponga los campos definidos y oculte datos internos de la base de datos simulada.
+| Capa | Responsabilidad |
+|------|-----------------|
+| `routes` | Define endpoints y delega al servicio |
+| `schemas` | Validación entrada/salida |
+| `services` | Reglas de negocio y errores |
+| `dependencies` | Funciones inyectables con `Depends()` |
+| `data` | Acceso a `fake_db` |
 
 ---
 
-## Instalación de dependencias
+## Instalación y ejecución
 
 ```bash
-# Clonar el repositorio
 git clone https://github.com/TU_USUARIO/device_systems.git
 cd device_systems
+git checkout ev08
 
-# Crear entorno virtual
 python -m venv venv
+venv\Scripts\activate          # Windows
+# source venv/bin/activate     # Linux/macOS
 
-# Activar entorno virtual
-# Windows:
-venv\Scripts\activate
-# Linux / macOS:
-source venv/bin/activate
-
-# Instalar dependencias
 pip install -r requirements.txt
-```
-
-**Contenido de `requirements.txt`:**
-
-```
-fastapi>=0.115.0
-uvicorn[standard]>=0.30.0
-pydantic[email]>=2.0.0
-```
-
----
-
-## Ejecución del servidor
-
-```bash
-uvicorn app.main:app --reload
+python -m uvicorn app.main:app --reload
 ```
 
 | Recurso | URL |
@@ -127,360 +88,190 @@ uvicorn app.main:app --reload
 
 ## Tabla de endpoints
 
-| Método | Ruta | Descripción | Código de éxito |
-|--------|------|-------------|-----------------|
-| GET | `/` | Información general de la API | 200 OK |
-| GET | `/users` | Listar todos los usuarios | 200 OK |
-| GET | `/users?role=admin` | Filtrar usuarios por rol | 200 OK |
-| GET | `/users?is_active=true` | Filtrar usuarios por estado activo | 200 OK |
-| GET | `/users/{user_id}` | Consultar un usuario por ID | 200 OK |
-| POST | `/users` | Registrar un nuevo usuario | 201 Created |
+| Método | Ruta | Descripción | Código éxito |
+|--------|------|-------------|--------------|
+| GET | `/users` | Listar usuarios (filtros opcionales) | 200 |
+| GET | `/users/{user_id}` | Consultar por ID | 200 |
+| POST | `/users` | Crear usuario | 201 |
+| PUT | `/users/{user_id}` | Actualización completa | 200 |
+| PATCH | `/users/{user_id}` | Actualización parcial | 200 |
+| DELETE | `/users/{user_id}` | Eliminar usuario | 204 |
 
 ---
 
-## Cabeceras HTTP personalizadas
+## Códigos de estado HTTP
 
-Todas las respuestas del recurso `/users` incluyen las siguientes cabeceras:
-
-```
-X-App-Name: device_systems
-X-API-Version: 1.0
-```
-
-Estas cabeceras identifican la aplicación y la versión de la API en cada respuesta HTTP.
+| Código | Uso |
+|--------|-----|
+| 200 | Consulta o actualización exitosa |
+| 201 | Usuario creado |
+| 204 | Usuario eliminado (sin cuerpo) |
+| 400 | Correo duplicado, rol inválido, PATCH vacío |
+| 401 | Clave API inválida (header opcional) |
+| 404 | Usuario no encontrado |
+| 422 | Datos inválidos (Pydantic) |
 
 ---
 
-## Ejemplos de peticiones y respuestas
+## Ejemplos de peticiones
 
-### GET /users – Listar todos los usuarios
-
-**Petición:**
+### GET /users
 
 ```http
 GET http://127.0.0.1:8000/users
 ```
 
-**Respuesta `200 OK`:**
-
-```json
-[
-  {"id": 1, "name": "Ana Garcia",  "email": "ana@device.com",    "role": "admin",   "is_active": true},
-  {"id": 2, "name": "Luis Perez",  "email": "luis@device.com",   "role": "support", "is_active": true},
-  {"id": 3, "name": "Maria Lopez", "email": "maria@device.com",  "role": "user",    "is_active": false},
-  {"id": 4, "name": "Carlos Ruiz", "email": "carlos@device.com", "role": "user",    "is_active": true}
-]
-```
-
----
-
-### GET /users?role=admin – Filtrar por rol (Query Parameter)
-
-**Petición:**
+### GET /users?role=admin
 
 ```http
 GET http://127.0.0.1:8000/users?role=admin
 ```
 
-**Respuesta `200 OK`:**
+### GET /users/1
 
 ```json
-[
-  {"id": 1, "name": "Ana Garcia", "email": "ana@device.com", "role": "admin", "is_active": true}
-]
+{"id": 1, "name": "Ana Garcia", "email": "ana@device.com", "role": "admin", "is_active": true}
 ```
 
----
-
-### GET /users?is_active=true – Filtrar por estado (Query Parameter)
-
-**Petición:**
-
-```http
-GET http://127.0.0.1:8000/users?is_active=true
-```
-
-**Respuesta `200 OK`:** Retorna solo los usuarios con `is_active` en `true`.
-
----
-
-### GET /users/{user_id} – Consultar por ID (Path Parameter)
-
-**Petición:**
-
-```http
-GET http://127.0.0.1:8000/users/1
-```
-
-**Respuesta `200 OK`:**
+### POST /users
 
 ```json
 {
-  "id": 1,
-  "name": "Ana Garcia",
-  "email": "ana@device.com",
+  "name": "Pedro Mora",
+  "email": "pedro@device.com",
+  "role": "user",
+  "is_active": true
+}
+```
+
+Respuesta: **201 Created**
+
+### PUT /users/1
+
+```json
+{
+  "name": "Ana Garcia Actualizada",
+  "email": "ana.nueva@device.com",
   "role": "admin",
   "is_active": true
 }
 ```
 
-**Error `404 Not Found` (usuario inexistente):**
+Respuesta: **200 OK**
+
+### PATCH /users/2
 
 ```json
-{
-  "detail": "Usuario 99 no encontrado"
-}
+{"role": "support"}
 ```
+
+Respuesta: **200 OK**
+
+### DELETE /users/5
+
+Respuesta: **204 No Content** (sin cuerpo)
 
 ---
 
-### POST /users – Crear un nuevo usuario
+## Manejo de errores
 
-**Petición:**
-
-```http
-POST http://127.0.0.1:8000/users
-Content-Type: application/json
-
-{
-  "name": "Pedro Mora",
-  "email": "pedro@device.com",
-  "role": "user",
-  "is_active": true
-}
-```
-
-**Respuesta `201 Created`:**
-
-```json
-{
-  "id": 5,
-  "name": "Pedro Mora",
-  "email": "pedro@device.com",
-  "role": "user",
-  "is_active": true
-}
-```
+| Escenario | Código | Ejemplo `detail` |
+|-----------|--------|------------------|
+| Usuario no encontrado | 404 | `"Usuario no encontrado"` |
+| Correo duplicado | 400 | `"El correo ... ya está registrado"` |
+| Rol no permitido | 400 | `"Rol no permitido: ..."` |
+| PATCH sin campos | 400 | `"Debe enviar al menos un campo para actualizar"` |
+| Datos inválidos | 422 | Respuesta automática Pydantic |
 
 ---
 
-## Evidencia de validaciones y errores
+## Dependency Injection (`Depends()`)
 
-### Correo electrónico duplicado – `409 Conflict`
+Archivo: `app/dependencies/user_dependencies.py`
 
-**Petición:**
+| Dependencia | Función |
+|-------------|---------|
+| `get_user_service()` | Instancia del servicio de usuarios |
+| `get_user_or_404()` | Obtiene usuario o lanza 404 |
+| `validate_email_not_exists()` | Valida correo único |
+| `validate_role()` | Valida rol permitido |
+| `get_api_config()` | Configuración y cabeceras |
+| `set_response_headers()` | Agrega `X-App-Name` y `X-API-Version` |
+| `verify_api_key()` | Autenticación simulada (`X-API-Key`) |
 
-```http
-POST http://127.0.0.1:8000/users
-Content-Type: application/json
+Ejemplo en rutas:
 
-{
-  "name": "Pedro Duplicado",
-  "email": "ana@device.com",
-  "role": "user",
-  "is_active": true
-}
+```python
+def get_user(user: Annotated[dict, Depends(get_user_or_404)]):
+    return user
 ```
 
-**Respuesta:**
+Cabeceras en respuestas:
 
-```json
-{
-  "detail": "El correo ana@device.com ya existe"
-}
 ```
+X-App-Name: device_systems
+X-API-Version: 2.0
+```
+
+Autenticación opcional: header `X-API-Key: device-systems-key`
 
 ---
 
-### Nombre demasiado corto – `422 Unprocessable Entity`
+## Capturas de Swagger UI y ReDoc
 
-**Petición:**
+> Ejecutar el servidor y capturar desde `/docs` y `/redoc`. Guardar en `docs/imagenes/`.
 
-```http
-POST http://127.0.0.1:8000/users
-Content-Type: application/json
-
-{
-  "name": "Jo",
-  "email": "nuevo@device.com",
-  "role": "user",
-  "is_active": true
-}
-```
-
-**Respuesta (validación automática de Pydantic):**
-
-```json
-{
-  "detail": [
-    {
-      "type": "string_too_short",
-      "loc": ["body", "name"],
-      "msg": "String should have at least 3 characters",
-      "input": "Jo"
-    }
-  ]
-}
-```
-
----
-
-### Rol no permitido – `422 Unprocessable Entity`
-
-**Petición:**
-
-```http
-POST http://127.0.0.1:8000/users
-Content-Type: application/json
-
-{
-  "name": "Usuario Test",
-  "email": "test@device.com",
-  "role": "superadmin",
-  "is_active": true
-}
-```
-
-**Respuesta:**
-
-```json
-{
-  "detail": [
-    {
-      "type": "literal_error",
-      "loc": ["body", "role"],
-      "msg": "Input should be 'admin', 'support' or 'user'"
-    }
-  ]
-}
-```
-
----
-
-### Correo con formato inválido – `422 Unprocessable Entity`
-
-**Petición:**
-
-```http
-POST http://127.0.0.1:8000/users
-Content-Type: application/json
-
-{
-  "name": "Usuario Test",
-  "email": "correo-invalido",
-  "role": "user",
-  "is_active": true
-}
-```
-
-**Respuesta:**
-
-```json
-{
-  "detail": [
-    {
-      "type": "value_error",
-      "loc": ["body", "email"],
-      "msg": "value is not a valid email address"
-    }
-  ]
-}
-```
+| Captura | Archivo sugerido |
+|---------|------------------|
+| Vista general Swagger | `swagger_vista_general.png` |
+| ReDoc | `redoc_vista_general.png` |
+| GET /users | `swagger_get_users.png` |
+| GET /users/{id} | `swagger_get_user_id.png` |
+| POST /users | `swagger_post_users.png` |
+| PUT /users/{id} | `swagger_put_users.png` |
+| PATCH /users/{id} | `swagger_patch_users.png` |
+| DELETE /users/{id} | `swagger_delete_users.png` |
+| Errores (404, 400, 422) | `swagger_errores.png` |
 
 ---
 
 ## Pruebas funcionales
 
-La API fue probada desde:
+### Casos exitosos
 
-- **Swagger UI** → http://127.0.0.1:8000/docs
-- **Postman / Thunder Client** → peticiones HTTP manuales
+- GET /users, GET /users?role=admin, GET /users/1
+- POST /users, PUT /users/1, PATCH /users/2, DELETE /users/5
 
-### Checklist de pruebas
+### Casos de error
 
-| Prueba | Resultado |
-|--------|-----------|
-| GET /users – listar usuarios | ✅ |
-| GET /users?role=admin – filtrar por rol | ✅ |
-| GET /users?is_active=false – filtrar por estado | ✅ |
-| GET /users/1 – consultar por ID | ✅ |
-| GET /users/99 – usuario inexistente (404) | ✅ |
-| POST /users – crear usuario válido (201) | ✅ |
-| POST /users – correo duplicado (409) | ✅ |
-| POST /users – datos inválidos (422) | ✅ |
+- GET /users/99 → 404
+- POST correo repetido → 400
+- POST datos inválidos → 422
+- PUT /users/99 → 404
+- PATCH /users/1 con `{}` → 400
+- DELETE /users/99 → 404
 
 ---
 
-## Capturas de Swagger UI
+## Ramas del repositorio
 
-> **Instrucciones:** Ejecutar el servidor y tomar las capturas desde http://127.0.0.1:8000/docs
+| Rama | Contenido |
+|------|-----------|
+| `main` | EV07 – GET y POST, estructura básica |
+| `ev08` | EV08 – CRUD completo, capas, Depends(), v2.0 |
 
-### Vista general de la API
+```bash
+# Ver EV07
+git checkout main
 
-![Swagger UI - Vista general](docs/imagenes/swagger_vista_general.png)
-
-Vista principal de Swagger UI con los endpoints GET y POST del recurso Users.
-
----
-
-### GET /users
-
-![Swagger UI - GET /users](docs/imagenes/swagger_get_users.png)
-
-Listado de usuarios con respuesta **200 OK**.
+# Ver EV08
+git checkout ev08
+```
 
 ---
 
-### GET /users/{user_id}
+## Reflexión final
 
-Consulta por ID con respuesta **200 OK** (`user_id = 1`):
+Este proyecto muestra la evolución de una API REST básica hacia una solución más profesional. La separación en capas facilita el mantenimiento; `HTTPException` unifica los errores; `Depends()` evita duplicar validaciones; y Swagger/ReDoc documentan la API automáticamente.
 
-![Swagger UI - GET /users/1](docs/imagenes/swagger_get_user_id.png)
-
-Usuario inexistente con respuesta **404 Not Found** (`user_id = 99`):
-
-![Swagger UI - GET /users/99 error 404](docs/imagenes/swagger_get_user_id_404.png)
-
----
-
-### POST /users
-
-![Swagger UI - POST /users](docs/imagenes/swagger_post_users.png)
-
-Creación de usuario con respuesta **201 Created**.
-
----
-
-### Validaciones y errores en Swagger
-
-![Swagger UI - Correo duplicado 409](docs/imagenes/swagger_errores.png)
-
-Correo electrónico duplicado con respuesta **409 Conflict**.
-
----
-
-## Reflexión sobre el uso de FastAPI
-
-FastAPI facilita la construcción de APIs REST de forma rápida, segura y bien documentada. En este proyecto se aplicaron los siguientes conceptos:
-
-**Organización del proyecto:** Se separó la configuración (`main.py`), los modelos de datos (`schemas/`) y las rutas (`routes/`) para mantener el código ordenado y fácil de mantener.
-
-**Pydantic v2:** Los modelos `UserCreate` y `UserResponse` validan automáticamente los datos de entrada y estandarizan las respuestas. Si el cliente envía datos incorrectos (nombre corto, correo inválido, rol no permitido), FastAPI responde con código `422` y un detalle claro del error, sin necesidad de escribir validaciones manuales.
-
-**Path Parameters:** El endpoint `GET /users/{user_id}` permite consultar un usuario específico pasando su ID en la URL.
-
-**Query Parameters:** Los endpoints `GET /users?role=admin` y `GET /users?is_active=true` demuestran cómo filtrar resultados sin modificar la estructura de la ruta.
-
-**Response Models:** Al declarar `response_model=UserResponse`, la API garantiza que solo se expongan los campos definidos, protegiendo la estructura interna de los datos.
-
-**Cabeceras HTTP:** Las cabeceras `X-App-Name` y `X-API-Version` permiten identificar la aplicación en cada respuesta, una práctica común en APIs profesionales.
-
-**Documentación automática:** Swagger UI se genera sin configuración adicional, lo que permite probar todos los endpoints directamente desde el navegador.
-
-En conclusión, FastAPI combina simplicidad, validación robusta y documentación automática, lo que lo convierte en una excelente opción para desarrollar APIs REST desde los fundamentos.
-
----
-
-## Presentación en Video device_systems
-
-**Video:**  https://youtu.be/mkzmeL9gkE4?si=K_5rLnpY6PTPtQUw
+La rama `main` conserva la evidencia de EV07; la rama `ev08` concentra la entrega de la actividad intermedia sin mezclar ambas versiones.
