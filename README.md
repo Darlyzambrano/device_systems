@@ -72,7 +72,7 @@ git checkout ev08
 
 python -m venv venv
 venv\Scripts\activate          # Windows
-# source venv/bin/activate     # Linux/macOS
+
 
 pip install -r requirements.txt
 python -m uvicorn app.main:app --reload
@@ -219,19 +219,83 @@ Autenticación opcional: header `X-API-Key: device-systems-key`
 
 ## Capturas de Swagger UI y ReDoc
 
-> Ejecutar el servidor y capturar desde `/docs` y `/redoc`. Guardar en `docs/imagenes/`.
+### Vista general Swagger (v2.0.0)
 
-| Captura | Archivo sugerido |
-|---------|------------------|
-| Vista general Swagger | `swagger_vista_general.png` |
-| ReDoc | `redoc_vista_general.png` |
-| GET /users | `swagger_get_users.png` |
-| GET /users/{id} | `swagger_get_user_id.png` |
-| POST /users | `swagger_post_users.png` |
-| PUT /users/{id} | `swagger_put_users.png` |
-| PATCH /users/{id} | `swagger_patch_users.png` |
-| DELETE /users/{id} | `swagger_delete_users.png` |
-| Errores (404, 400, 422) | `swagger_errores.png` |
+![Swagger UI - Vista general](docs/imagenes/swagger_vista_general.png)
+
+Endpoints GET, POST, PUT, PATCH y DELETE del recurso Users.
+
+---
+
+### ReDoc
+
+![ReDoc - Vista general](docs/imagenes/redoc_vista_general.png)
+
+Documentación alternativa en http://127.0.0.1:8000/redoc con versión **2.0.0**.
+
+---
+
+### GET /users
+
+![Swagger - GET /users](docs/imagenes/swagger_get_users.png)
+
+Listado de usuarios con respuesta **200 OK**.
+
+---
+
+### GET /users/{user_id}
+
+![Swagger - GET /users/1](docs/imagenes/swagger_get_user_id.png)
+
+Consulta por ID con respuesta **200 OK** y cabeceras `X-API-Version: 2.0`.
+
+![Swagger - GET /users/99 error 404](docs/imagenes/swagger_get_user_id_404.png)
+
+Usuario inexistente con respuesta **404 Not Found**.
+
+---
+
+### POST /users
+
+![Swagger - POST /users](docs/imagenes/swagger_post_users.png)
+
+Creación de usuario con respuesta **201 Created**.
+
+---
+
+### PUT /users/{user_id}
+
+![Swagger - PUT /users/1](docs/imagenes/swagger_put_users.png)
+
+Actualización completa con respuesta **200 OK**.
+
+---
+
+### PATCH /users/{user_id}
+
+![Swagger - PATCH /users/1](docs/imagenes/swagger_patch_users.png)
+
+Actualización parcial con respuesta **200 OK**.
+
+![Swagger - PATCH vacío error 400](docs/imagenes/swagger_patch_vacio_400.png)
+
+Body vacío `{}` con respuesta **400 Bad Request**.
+
+---
+
+### DELETE /users/{user_id}
+
+![Swagger - DELETE /users/2](docs/imagenes/swagger_delete_users.png)
+
+Eliminación exitosa con respuesta **204 No Content** y cabeceras personalizadas.
+
+---
+
+### Errores controlados
+
+![Swagger - Errores](docs/imagenes/swagger_errores.png)
+
+Ejemplo de error controlado (correo duplicado, validación o autenticación).
 
 ---
 
@@ -275,3 +339,7 @@ git checkout ev08
 Este proyecto muestra la evolución de una API REST básica hacia una solución más profesional. La separación en capas facilita el mantenimiento; `HTTPException` unifica los errores; `Depends()` evita duplicar validaciones; y Swagger/ReDoc documentan la API automáticamente.
 
 La rama `main` conserva la evidencia de EV07; la rama `ev08` concentra la entrega de la actividad intermedia sin mezclar ambas versiones.
+
+## Video 
+
+https://youtu.be/kAr74iHg6eM?si=lpl7vf5WRLH8VGvQ
