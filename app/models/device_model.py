@@ -6,14 +6,15 @@ from sqlalchemy.orm import relationship
 from app.database.connection import Base
 
 
-class User(Base):
-    __tablename__ = "users"
+class Device(Base):
+    __tablename__ = "devices"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
-    email = Column(String, unique=True, nullable=False, index=True)
-    role = Column(String, nullable=False)
-    is_active = Column(Boolean, default=True)
+    serial_number = Column(String, unique=True, nullable=False, index=True)
+    device_type = Column(String, nullable=False, index=True)
+    brand = Column(String, nullable=True)
+    is_available = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    loans = relationship("Loan", back_populates="user")
+    loans = relationship("Loan", back_populates="device")

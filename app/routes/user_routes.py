@@ -3,13 +3,16 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, Query, Response
 
 from app.dependencies.user_dependencies import (
+    get_loan_service,
     get_user_or_404,
     get_user_service,
     set_response_headers,
     verify_api_key,
 )
 from app.models.user_model import User
+from app.schemas.loan_schema import LoanDetailResponse
 from app.schemas.user_schema import UserCreate, UserPatch, UserResponse, UserUpdate
+from app.services.loan_service import LoanService
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -40,6 +43,21 @@ def list_users(
         order_by=order_by,
         sort=sort or "asc",
     )
+
+
+@router.get(
+    "/{user_id}/loans",
+    response_model=list[LoanDetailResponse],
+    summary="Préstamos de un usuario",
+    description="Consulta dispositivos prestados al usuario con joins.",
+)
+def get_user_loans(
+    user_id: int,
+    _: Annotated[dict, Depends(verify_api_key)],
+    __: Annotated[None, Depends(set_response_headers)],
+    service: Annotated[LoanService, Depends(get_loan_service)],
+):
+    return service.get_user_loans(user_id)
 
 
 @router.get(
