@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
+
+from app.schemas.auth_schema import PASSWORD_PATTERN
 
 ALLOWED_ROLES = Literal["admin", "support", "user"]
 
@@ -11,6 +13,25 @@ class UserCreate(BaseModel):
     email: EmailStr = Field(..., description="Correo electrónico único")
     role: ALLOWED_ROLES = Field(..., description="Rol: admin, support o user")
     is_active: bool = Field(default=True, description="Estado activo del usuario")
+    password: Optional[str] = Field(
+        None,
+        min_length=8,
+        description="Contraseña segura (opcional para creación administrativa)",
+    )
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        if " " in value or "\t" in value:
+            raise ValueError("La contraseña no puede contener espacios en blanco")
+        if not PASSWORD_PATTERN.match(value):
+            raise ValueError(
+                "La contraseña debe tener mínimo 8 caracteres, "
+                "una mayúscula, una minúscula y un número"
+            )
+        return value
 
 
 class UserUpdate(BaseModel):

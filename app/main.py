@@ -1,14 +1,28 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy.orm import Session
 
+from app.auth.auth_routes import router as auth_router
+from app.auth.security import get_password_hash
+from app.core.config import get_settings
 from app.database.connection import SessionLocal
+from app.limiter import limiter
+from app.middlewares.request_middleware import RequestMiddleware
 from app.models.device_model import Device
 from app.models.user_model import User
 from app.routes.device_routes import router as device_router
 from app.routes.loan_routes import router as loan_router
 from app.routes.user_routes import router as user_router
+
+logging.basicConfig(level=logging.INFO)
+
+SEED_PASSWORD = "Admin1234"
 
 SEED_USERS = [
     {"name": "Ana Garcia", "email": "ana@device.com", "role": "admin", "is_active": True},
@@ -46,8 +60,9 @@ def seed_data() -> None:
     db: Session = SessionLocal()
     try:
         if db.query(User).count() == 0:
+            hashed = get_password_hash(SEED_PASSWORD)
             for data in SEED_USERS:
-                db.add(User(**data))
+                db.add(User(**data, hashed_password=hashed))
         if db.query(Device).count() == 0:
             for data in SEED_DEVICES:
                 db.add(Device(**data))
@@ -62,13 +77,15 @@ async def lifespan(app: FastAPI):
     yield
 
 
+settings = get_settings()
+
 app = FastAPI(
     title="device_systems API",
     description=(
-        "API REST para gestión de usuarios, dispositivos y préstamos. "
-        "SQLAlchemy, Alembic, relaciones One-to-Many y consultas con joins."
+        "API REST segura para gestión de usuarios, dispositivos y préstamos. "
+        "OAuth2, JWT, CORS, middleware, rate limiting y validaciones Pydantic v2."
     ),
-    version="4.0.0",
+    version=settings.app_version,
     contact={
         "name": "Equipo device_systems",
         "email": "soporte@device.com",
@@ -76,6 +93,20 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.add_middleware(RequestMiddleware)
+
+app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(device_router)
 app.include_router(loan_router)
@@ -84,10 +115,11 @@ app.include_router(loan_router)
 @app.get("/", tags=["General"], summary="Información de la API")
 def root():
     return {
-        "app": "device_systems",
-        "version": "4.0.0",
+        "app": settings.app_name,
+        "version": settings.app_version,
         "database": "SQLite (device_systems.db)",
         "migrations": "Alembic",
+        "security": "OAuth2 + JWT + Rate Limiting",
         "docs": "/docs",
         "redoc": "/redoc",
     }

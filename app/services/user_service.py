@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.auth.security import get_password_hash
 from app.models.user_model import User
 from app.schemas.user_schema import UserCreate, UserPatch, UserUpdate
 
@@ -52,7 +53,13 @@ class UserService:
                 status_code=400,
                 detail=f"El correo {user_data.email} ya está registrado",
             )
-        user = User(**user_data.model_dump())
+        user = User(
+            name=user_data.name,
+            email=user_data.email,
+            hashed_password=get_password_hash(user_data.password or "ChangeMe123"),
+            role=user_data.role,
+            is_active=user_data.is_active,
+        )
         self.db.add(user)
         try:
             self.db.commit()

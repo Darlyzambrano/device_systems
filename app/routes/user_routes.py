@@ -1,14 +1,14 @@
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Request
 
+from app.dependencies.auth_dependency import get_current_active_user, require_admin_or_support
 from app.dependencies.user_dependencies import (
     get_loan_service,
     get_user_or_404,
     get_user_service,
-    set_response_headers,
-    verify_api_key,
 )
+from app.limiter import limiter
 from app.models.user_model import User
 from app.schemas.loan_schema import LoanDetailResponse
 from app.schemas.user_schema import UserCreate, UserPatch, UserResponse, UserUpdate
@@ -22,12 +22,17 @@ router = APIRouter(prefix="/users", tags=["Users"])
     "/",
     response_model=list[UserResponse],
     summary="Listar usuarios",
-    description="Lista usuarios desde la base de datos. Filtros por rol y estado. Orden por nombre o fecha.",
+    description="Lista usuarios desde la base de datos. Requiere autenticación.",
     response_description="Lista de usuarios",
+    responses={
+        401: {"description": "No autenticado"},
+        429: {"description": "Demasiadas solicitudes"},
+    },
 )
+@limiter.limit("30/minute")
 def list_users(
-    _: Annotated[dict, Depends(verify_api_key)],
-    __: Annotated[None, Depends(set_response_headers)],
+    request: Request,
+    _: Annotated[User, Depends(get_current_active_user)],
     service: Annotated[UserService, Depends(get_user_service)],
     role: Optional[str] = Query(None, description="Filtrar por rol: admin, support o user"),
     is_active: Optional[bool] = Query(None, description="Filtrar por estado activo"),
@@ -53,8 +58,7 @@ def list_users(
 )
 def get_user_loans(
     user_id: int,
-    _: Annotated[dict, Depends(verify_api_key)],
-    __: Annotated[None, Depends(set_response_headers)],
+    _: Annotated[User, Depends(get_current_active_user)],
     service: Annotated[LoanService, Depends(get_loan_service)],
 ):
     return service.get_user_loans(user_id)
@@ -64,14 +68,16 @@ def get_user_loans(
     "/{user_id}",
     response_model=UserResponse,
     summary="Consultar usuario por ID",
-    description="Obtiene un usuario desde la base de datos por su ID.",
+    description="Obtiene un usuario desde la base de datos por su ID. Requiere autenticación.",
     response_description="Datos del usuario",
-    responses={404: {"description": "Usuario no encontrado"}},
+    responses={
+        401: {"description": "No autenticado"},
+        404: {"description": "Usuario no encontrado"},
+    },
 )
 def get_user(
     user: Annotated[User, Depends(get_user_or_404)],
-    _: Annotated[dict, Depends(verify_api_key)],
-    __: Annotated[None, Depends(set_response_headers)],
+    _: Annotated[User, Depends(get_current_active_user)],
 ):
     return user
 
@@ -81,17 +87,18 @@ def get_user(
     response_model=UserResponse,
     status_code=201,
     summary="Crear usuario",
-    description="Registra un nuevo usuario en la base de datos.",
+    description="Registra un nuevo usuario en la base de datos (admin/support).",
     response_description="Usuario creado",
     responses={
         400: {"description": "Correo duplicado o rol no permitido"},
+        401: {"description": "No autenticado"},
+        403: {"description": "Sin permisos"},
         422: {"description": "Datos inválidos"},
     },
 )
 def create_user(
     user_data: UserCreate,
-    _: Annotated[dict, Depends(verify_api_key)],
-    __: Annotated[None, Depends(set_response_headers)],
+    _: Annotated[User, Depends(require_admin_or_support)],
     service: Annotated[UserService, Depends(get_user_service)],
 ):
     return service.create_user(user_data)
@@ -112,8 +119,7 @@ def create_user(
 def update_user(
     user_id: int,
     user_data: UserUpdate,
-    _: Annotated[dict, Depends(verify_api_key)],
-    __: Annotated[None, Depends(set_response_headers)],
+    _: Annotated[User, Depends(require_admin_or_support)],
     service: Annotated[UserService, Depends(get_user_service)],
 ):
     return service.update_user(user_id, user_data)
@@ -134,8 +140,7 @@ def update_user(
 def patch_user(
     user_id: int,
     user_data: UserPatch,
-    _: Annotated[dict, Depends(verify_api_key)],
-    __: Annotated[None, Depends(set_response_headers)],
+    _: Annotated[User, Depends(require_admin_or_support)],
     service: Annotated[UserService, Depends(get_user_service)],
 ):
     return service.patch_user(user_id, user_data)
@@ -151,8 +156,7 @@ def patch_user(
 )
 def delete_user(
     user_id: int,
-    _: Annotated[dict, Depends(verify_api_key)],
-    __: Annotated[None, Depends(set_response_headers)],
+    _: Annotated[User, Depends(require_admin_or_support)],
     service: Annotated[UserService, Depends(get_user_service)],
 ):
     service.delete_user(user_id)
