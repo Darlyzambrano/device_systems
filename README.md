@@ -1,35 +1,34 @@
 # device_systems API
 
-**Actividad:** GA1-220501096-01-AA1-EV08 – FastAPI Intermedio: CRUD completo, manejo de errores, Swagger/OpenAPI y Dependency Injection
+**Actividad:** GA1-220501096-01-AA1-EV09 – FastAPI con SQLAlchemy: Persistencia de Datos y CRUD
 
-**Rama:** `ev08` (EV07 permanece en `main`)
+**Rama:** `ev09`
 
-API REST con **FastAPI** para gestión de usuarios: CRUD completo, capas separadas, `Depends()`, códigos HTTP y documentación OpenAPI.
+API REST con **FastAPI** y **SQLAlchemy** para gestionar usuarios con persistencia en **SQLite**.
 
 ---
 
 ## Descripción
 
-`device_systems` evoluciona desde GET/POST hacia una API profesional que permite:
+`device_systems` evoluciona desde datos en memoria (EV08) hacia persistencia real en base de datos. Los usuarios se almacenan en `device_systems.db` mediante el ORM SQLAlchemy.
 
-- Crear, listar, consultar, actualizar y eliminar usuarios
-- Filtrar por `role` e `is_active`
-- Validar datos con Pydantic v2
-- Manejar errores con `HTTPException`
-- Reutilizar lógica con **Dependency Injection**
-- Documentar endpoints en Swagger UI y ReDoc
+- CRUD completo sobre base de datos
+- Modelo SQLAlchemy `User` con constraints (`unique`, `nullable`)
+- Schemas Pydantic separados del modelo de BD
+- Sesión de BD inyectada con `Depends(get_db)`
+- Filtros por rol y estado, orden por nombre o `created_at`
 
 ---
 
-## Tecnologías utilizadas
+## Tecnologías
 
 | Tecnología | Uso |
 |------------|-----|
-| Python 3.10+ | Lenguaje |
-| FastAPI | Framework API REST |
-| Uvicorn | Servidor ASGI |
-| Pydantic v2 | Validación y serialización |
-| Git | Control de versiones (ramas `main` / `ev08`) |
+| FastAPI | API REST |
+| SQLAlchemy | ORM y persistencia |
+| SQLite | Base de datos local |
+| Pydantic v2 | Validación entrada/salida |
+| Uvicorn | Servidor |
 
 ---
 
@@ -39,41 +38,45 @@ API REST con **FastAPI** para gestión de usuarios: CRUD completo, capas separad
 device_systems/
 ├── app/
 │   ├── main.py
-│   ├── routes/
-│   │   └── user_routes.py       # Endpoints HTTP (capa delgada)
+│   ├── database/
+│   │   └── connection.py      # Engine, SessionLocal, Base, get_db
+│   ├── models/
+│   │   └── user_model.py      # Modelo SQLAlchemy (tabla users)
 │   ├── schemas/
-│   │   └── user_schema.py       # Modelos Pydantic
+│   │   └── user_schema.py     # Schemas Pydantic
+│   ├── routes/
+│   │   └── user_routes.py
 │   ├── services/
-│   │   └── user_service.py      # Lógica de negocio
-│   ├── dependencies/
-│   │   └── user_dependencies.py # Depends() reutilizables
-│   └── data/
-│       └── users_db.py          # Base de datos en memoria
+│   │   └── user_service.py
+│   └── dependencies/
+│       ├── database_dependency.py
+│       └── user_dependencies.py
+├── device_systems.db          # Generada al ejecutar (no subir a git)
 ├── requirements.txt
 └── README.md
 ```
 
-| Capa | Responsabilidad |
-|------|-----------------|
-| `routes` | Define endpoints y delega al servicio |
-| `schemas` | Validación entrada/salida |
-| `services` | Reglas de negocio y errores |
-| `dependencies` | Funciones inyectables con `Depends()` |
-| `data` | Acceso a `fake_db` |
+---
+
+## Modelo SQLAlchemy vs Schema Pydantic
+
+| | Modelo SQLAlchemy (`User`) | Schema Pydantic (`UserResponse`) |
+|--|---------------------------|----------------------------------|
+| Uso | Tabla en base de datos | JSON de la API |
+| Campos BD | `Column`, constraints | Validación de tipos |
+| Ejemplo | `email` unique en SQLite | `email` formato EmailStr |
+| `created_at` | `DateTime` en BD | `datetime` en respuesta |
+
+El servicio convierte: BD → modelo SQLAlchemy → `UserResponse` con `from_attributes=True`.
 
 ---
 
 ## Instalación y ejecución
 
 ```bash
-git clone https://github.com/TU_USUARIO/device_systems.git
-cd device_systems
-git checkout ev08
-
+git checkout ev09
 python -m venv venv
-venv\Scripts\activate          # Windows
-
-
+venv\Scripts\activate
 pip install -r requirements.txt
 python -m uvicorn app.main:app --reload
 ```
@@ -81,175 +84,105 @@ python -m uvicorn app.main:app --reload
 | Recurso | URL |
 |---------|-----|
 | API | http://127.0.0.1:8000 |
-| Swagger UI | http://127.0.0.1:8000/docs |
+| Swagger | http://127.0.0.1:8000/docs |
 | ReDoc | http://127.0.0.1:8000/redoc |
 
----
-
-## Tabla de endpoints
-
-| Método | Ruta | Descripción | Código éxito |
-|--------|------|-------------|--------------|
-| GET | `/users` | Listar usuarios (filtros opcionales) | 200 |
-| GET | `/users/{user_id}` | Consultar por ID | 200 |
-| POST | `/users` | Crear usuario | 201 |
-| PUT | `/users/{user_id}` | Actualización completa | 200 |
-| PATCH | `/users/{user_id}` | Actualización parcial | 200 |
-| DELETE | `/users/{user_id}` | Eliminar usuario | 204 |
+Al iniciar se crea `device_systems.db` y se insertan 4 usuarios de ejemplo si la tabla está vacía.
 
 ---
 
-## Códigos de estado HTTP
+## Endpoints
 
-| Código | Uso |
-|--------|-----|
-| 200 | Consulta o actualización exitosa |
-| 201 | Usuario creado |
-| 204 | Usuario eliminado (sin cuerpo) |
-| 400 | Correo duplicado, rol inválido, PATCH vacío |
-| 401 | Clave API inválida (header opcional) |
-| 404 | Usuario no encontrado |
-| 422 | Datos inválidos (Pydantic) |
-
----
-
-## Ejemplos de peticiones
-
-### GET /users
-
-```http
-GET http://127.0.0.1:8000/users
-```
-
-### GET /users?role=admin
-
-```http
-GET http://127.0.0.1:8000/users?role=admin
-```
-
-### GET /users/1
-
-```json
-{"id": 1, "name": "Ana Garcia", "email": "ana@device.com", "role": "admin", "is_active": true}
-```
-
-### POST /users
-
-```json
-{
-  "name": "Pedro Mora",
-  "email": "pedro@device.com",
-  "role": "user",
-  "is_active": true
-}
-```
-
-Respuesta: **201 Created**
-
-### PUT /users/1
-
-```json
-{
-  "name": "Ana Garcia Actualizada",
-  "email": "ana.nueva@device.com",
-  "role": "admin",
-  "is_active": true
-}
-```
-
-Respuesta: **200 OK**
-
-### PATCH /users/2
-
-```json
-{"role": "support"}
-```
-
-Respuesta: **200 OK**
-
-### DELETE /users/5
-
-Respuesta: **204 No Content** (sin cuerpo)
+| Método | Ruta | Código éxito |
+|--------|------|--------------|
+| GET | `/users` | 200 |
+| GET | `/users?role=admin` | 200 |
+| GET | `/users?is_active=true` | 200 |
+| GET | `/users?order_by=name&sort=asc` | 200 |
+| GET | `/users/{id}` | 200 |
+| POST | `/users` | 201 |
+| PUT | `/users/{id}` | 200 |
+| PATCH | `/users/{id}` | 200 |
+| DELETE | `/users/{id}` | 204 |
 
 ---
 
-## Manejo de errores
+## Códigos de error
 
-| Escenario | Código | Ejemplo `detail` |
-|-----------|--------|------------------|
-| Usuario no encontrado | 404 | `"Usuario no encontrado"` |
-| Correo duplicado | 400 | `"El correo ... ya está registrado"` |
-| Rol no permitido | 400 | `"Rol no permitido: ..."` |
-| PATCH sin campos | 400 | `"Debe enviar al menos un campo para actualizar"` |
-| Datos inválidos | 422 | Respuesta automática Pydantic |
+| Caso | Código |
+|------|--------|
+| Usuario no encontrado | 404 |
+| Email duplicado | 400 |
+| PATCH vacío | 400 |
+| Rol no permitido | 400 |
+| Validación Pydantic | 422 |
 
 ---
 
-## Dependency Injection (`Depends()`)
-
-Archivo: `app/dependencies/user_dependencies.py`
-
-| Dependencia | Función |
-|-------------|---------|
-| `get_user_service()` | Instancia del servicio de usuarios |
-| `get_user_or_404()` | Obtiene usuario o lanza 404 |
-| `validate_email_not_exists()` | Valida correo único |
-| `validate_role()` | Valida rol permitido |
-| `get_api_config()` | Configuración y cabeceras |
-| `set_response_headers()` | Agrega `X-App-Name` y `X-API-Version` |
-| `verify_api_key()` | Autenticación simulada (`X-API-Key`) |
-
-Ejemplo en rutas:
+## Dependencia de base de datos
 
 ```python
-def get_user(user: Annotated[dict, Depends(get_user_or_404)]):
-    return user
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 ```
 
-Cabeceras en respuestas:
-
-```
-X-App-Name: device_systems
-X-API-Version: 2.0
-```
-
-Autenticación opcional: header `X-API-Key: device-systems-key`
+Usada en rutas: `Depends(get_db)` → inyecta sesión SQLAlchemy al servicio.
 
 ---
 
-## Capturas de Swagger UI y ReDoc
+## Capturas (evidencias)
 
-### Vista general Swagger (v2.0.0)
+### Estructura del proyecto
 
-![Swagger UI - Vista general](docs/imagenes/swagger_vista_general.png)
+![Estructura EV09](docs/imagenes/estructura_proyecto_ev09.png)
 
-Endpoints GET, POST, PUT, PATCH y DELETE del recurso Users.
-
----
-
-### ReDoc
-
-![ReDoc - Vista general](docs/imagenes/redoc_vista_general.png)
-
-Documentación alternativa en http://127.0.0.1:8000/redoc con versión **2.0.0**.
+Carpetas `database/`, `models/`, `schemas/`, `services/` y `dependencies/`.
 
 ---
 
-### GET /users
+### Base de datos generada
 
-![Swagger - GET /users](docs/imagenes/swagger_get_users.png)
+![device_systems.db](docs/imagenes/device_systems_db.png)
 
-Listado de usuarios con respuesta **200 OK**.
+Archivo SQLite `device_systems.db` creado al ejecutar el servidor.
+
+---
+
+### Swagger UI v3.0.0
+
+![Swagger vista general](docs/imagenes/swagger_vista_general_ev09.png)
+
+Endpoints GET, POST, PUT, PATCH y DELETE con persistencia SQLAlchemy.
+
+![Swagger endpoints y schemas](docs/imagenes/swagger_endpoints_schemas_ev09.png)
+
+Sección de endpoints y schemas documentados.
+
+![Schemas Pydantic](docs/imagenes/swagger_schemas_pydantic_ev09.png)
+
+Modelos `UserCreate`, `UserUpdate`, `UserPatch` y `UserResponse`.
+
+---
+
+### GET /users – Filtros y ordenamiento
+
+![GET /users con filtros](docs/imagenes/swagger_get_users_filtros_ev09.png)
+
+Filtro por `role=admin`, `is_active=true`, orden por `created_at`. Respuesta **200** con campo `created_at`.
 
 ---
 
 ### GET /users/{user_id}
 
-![Swagger - GET /users/1](docs/imagenes/swagger_get_user_id.png)
+![GET /users/1](docs/imagenes/swagger_get_user_id_ev09.png)
 
-Consulta por ID con respuesta **200 OK** y cabeceras `X-API-Version: 2.0`.
+Consulta por ID con respuesta **200 OK** desde la base de datos.
 
-![Swagger - GET /users/99 error 404](docs/imagenes/swagger_get_user_id_404.png)
+![GET /users/99 error 404](docs/imagenes/swagger_get_user_id_404.png)
 
 Usuario inexistente con respuesta **404 Not Found**.
 
@@ -257,7 +190,7 @@ Usuario inexistente con respuesta **404 Not Found**.
 
 ### POST /users
 
-![Swagger - POST /users](docs/imagenes/swagger_post_users.png)
+![POST /users](docs/imagenes/swagger_post_users.png)
 
 Creación de usuario con respuesta **201 Created**.
 
@@ -265,19 +198,19 @@ Creación de usuario con respuesta **201 Created**.
 
 ### PUT /users/{user_id}
 
-![Swagger - PUT /users/1](docs/imagenes/swagger_put_users.png)
+![PUT /users/1](docs/imagenes/swagger_put_result_ev09.png)
 
-Actualización completa con respuesta **200 OK**.
+Actualización completa con respuesta **200 OK** (`x-api-version: 3.0`).
 
 ---
 
 ### PATCH /users/{user_id}
 
-![Swagger - PATCH /users/1](docs/imagenes/swagger_patch_users.png)
+![PATCH /users/1](docs/imagenes/swagger_patch_result_ev09.png)
 
 Actualización parcial con respuesta **200 OK**.
 
-![Swagger - PATCH vacío error 400](docs/imagenes/swagger_patch_vacio_400.png)
+![PATCH vacío error 400](docs/imagenes/swagger_patch_vacio_400.png)
 
 Body vacío `{}` con respuesta **400 Bad Request**.
 
@@ -285,61 +218,40 @@ Body vacío `{}` con respuesta **400 Bad Request**.
 
 ### DELETE /users/{user_id}
 
-![Swagger - DELETE /users/2](docs/imagenes/swagger_delete_users.png)
+![DELETE /users/1](docs/imagenes/swagger_delete_users_ev09.png)
 
-Eliminación exitosa con respuesta **204 No Content** y cabeceras personalizadas.
+Eliminación exitosa con respuesta **204 No Content**.
 
 ---
 
 ### Errores controlados
 
-![Swagger - Errores](docs/imagenes/swagger_errores.png)
+![Correo duplicado 400](docs/imagenes/swagger_errores.png)
 
-Ejemplo de error controlado (correo duplicado, validación o autenticación).
-
----
-
-## Pruebas funcionales
-
-### Casos exitosos
-
-- GET /users, GET /users?role=admin, GET /users/1
-- POST /users, PUT /users/1, PATCH /users/2, DELETE /users/5
-
-### Casos de error
-
-- GET /users/99 → 404
-- POST correo repetido → 400
-- POST datos inválidos → 422
-- PUT /users/99 → 404
-- PATCH /users/1 con `{}` → 400
-- DELETE /users/99 → 404
+Correo electrónico duplicado con respuesta **400 Bad Request**.
 
 ---
 
-## Ramas del repositorio
+### ReDoc
+
+![ReDoc v3.0](docs/imagenes/redoc_vista_general.png)
+
+Documentación alternativa en `/redoc`.
+
+---
+
+## Ramas
 
 | Rama | Contenido |
 |------|-----------|
-| `main` | EV07 – GET y POST, estructura básica |
-| `ev08` | EV08 – CRUD completo, capas, Depends(), v2.0 |
+| `main` | EV07 – GET/POST |
+| `ev08` | CRUD en memoria |
+| `ev09` | SQLAlchemy + SQLite |
 
-```bash
-# Ver EV07
-git checkout main
+## Reflexión
 
-# Ver EV08
-git checkout ev08
-```
+La persistencia con SQLAlchemy permite que los datos sobrevivan al reinicio del servidor. Separar modelo de BD y schemas Pydantic mantiene la API limpia: la base de datos puede cambiar sin alterar el contrato JSON de los endpoints.
 
----
+## Video
 
-## Reflexión final
-
-Este proyecto muestra la evolución de una API REST básica hacia una solución más profesional. La separación en capas facilita el mantenimiento; `HTTPException` unifica los errores; `Depends()` evita duplicar validaciones; y Swagger/ReDoc documentan la API automáticamente.
-
-La rama `main` conserva la evidencia de EV07; la rama `ev08` concentra la entrega de la actividad intermedia sin mezclar ambas versiones.
-
-## Video 
-
-https://youtu.be/kAr74iHg6eM?si=lpl7vf5WRLH8VGvQ
+https://youtu.be/Nd36fHtzmqc?si=IGVaa6i2UHqIJx0x

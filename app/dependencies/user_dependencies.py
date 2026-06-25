@@ -1,8 +1,9 @@
 from typing import Annotated, Optional
 
 from fastapi import Depends, Header, HTTPException, Response
+from sqlalchemy.orm import Session
 
-from app.data import users_db
+from app.database.connection import get_db
 from app.services.user_service import UserService
 
 ALLOWED_ROLES = {"admin", "support", "user"}
@@ -11,16 +12,16 @@ ALLOWED_ROLES = {"admin", "support", "user"}
 def get_api_config() -> dict:
     return {
         "app_name": "device_systems",
-        "version": "2.0.0",
+        "version": "3.0.0",
         "headers": {
             "X-App-Name": "device_systems",
-            "X-API-Version": "2.0",
+            "X-API-Version": "3.0",
         },
     }
 
 
-def get_user_service() -> UserService:
-    return UserService()
+def get_user_service(db: Annotated[Session, Depends(get_db)]) -> UserService:
+    return UserService(db)
 
 
 def set_response_headers(
@@ -34,27 +35,8 @@ def set_response_headers(
 def get_user_or_404(
     user_id: int,
     service: Annotated[UserService, Depends(get_user_service)],
-) -> dict:
+):
     return service.get_user(user_id)
-
-
-def validate_email_not_exists(
-    email: str,
-    exclude_id: Optional[int] = None,
-) -> None:
-    if users_db.email_exists(email, exclude_id=exclude_id):
-        raise HTTPException(
-            status_code=400,
-            detail=f"El correo {email} ya está registrado",
-        )
-
-
-def validate_role(role: str) -> None:
-    if role not in ALLOWED_ROLES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Rol no permitido: {role}. Roles válidos: admin, support, user",
-        )
 
 
 def verify_api_key(

@@ -1,6 +1,7 @@
+from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 ALLOWED_ROLES = Literal["admin", "support", "user"]
 
@@ -32,5 +33,6 @@ class UserResponse(BaseModel):
     email: str
     role: str
     is_active: bool
+    created_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
