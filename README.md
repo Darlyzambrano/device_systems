@@ -475,4 +475,5 @@ La seguridad en APIs REST no es opcional: proteger credenciales con hash, valida
 
 ## Video
 
-[Enlace al video de YouTube – explicación funcional y de seguridad]
+(https://youtu.be/JJVVAE0Jgzo?si=M2Wnvyiy-VEP7ZU0)
+
