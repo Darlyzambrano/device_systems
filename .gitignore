@@ -1,6 +1,14 @@
 venv/
 __pycache__/
 *.pyc
+<<<<<<< HEAD
 .env
 .idea/
 .vscode/
+=======
+*.db
+.env
+.idea/
+.vscode/
+device_systems/
+>>>>>>> device_systems_security

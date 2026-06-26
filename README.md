@@ -1,36 +1,67 @@
-# device_systems – Fundamentos de FastAPI
+# device_systems API
 
-**Actividad:** GA1-220501096-01-AA1-EV07 – Fundamentos de FastAPI: API REST para Gestión de Usuarios
+**Actividad:** GA1-220501096-01-AA1-EV11 – FastAPI Seguridad: Autenticación, Middleware, CORS, Rate Limiting y Validación Avanzada
 
-API REST construida con **FastAPI** para la gestión de usuarios del sistema `device_systems`.
+**Rama:** `device_systems_security`
 
----
+API REST segura para gestión de **usuarios**, **dispositivos** y **préstamos**.
 
-## Descripción de la aplicación
+Esta versión incluye:
 
-`device_systems` es una aplicación backend que expone un recurso `/users` para administrar usuarios del sistema. La API permite:
-
-- Listar todos los usuarios
-- Consultar un usuario por ID (Path Parameter)
-- Filtrar usuarios por rol o estado activo (Query Parameters)
-- Registrar nuevos usuarios con validación de datos
-- Evitar correos electrónicos duplicados
-- Retornar respuestas estandarizadas con `response_model`
-- Incluir cabeceras HTTP personalizadas en cada respuesta
-
-La documentación interactiva se genera automáticamente con **Swagger UI** al ejecutar el servidor.
+- Autenticación **OAuth2** con **JWT**
+- Hash seguro de contraseñas con **passlib[bcrypt]**
+- Rutas protegidas por token y **roles** (`admin`, `support`, `user`)
+- Validaciones avanzadas con **Pydantic v2**
+- **Middleware** personalizado para trazabilidad y cabeceras
+- **CORS** configurado para orígenes autorizados
+- **Rate limiting** con **slowapi**
+- Migraciones de Alembic para campos de autenticación
 
 ---
 
-## Tecnologías utilizadas
+## Índice
+
+1. [Descripción](#descripción)
+2. [Tecnologías](#tecnologías)
+3. [Estructura del proyecto](#estructura-del-proyecto)
+4. [Instalación](#instalación)
+5. [Configuración de entorno](#configuración-de-entorno)
+6. [Migraciones](#migraciones)
+7. [Ejecución](#ejecución)
+8. [Endpoints principales](#endpoints-principales)
+9. [Autenticación y autorización](#autenticación-y-autorización)
+10. [Validaciones de seguridad](#validaciones-de-seguridad)
+11. [CORS](#cors)
+12. [Middleware personalizado](#middleware-personalizado)
+13. [Rate limiting](#rate-limiting)
+14. [Datos de prueba](#datos-de-prueba)
+15. [Documentación y evidencia](#documentación-y-evidencia)
+16. [Buenas prácticas aplicadas](#buenas-prácticas-aplicadas)
+
+---
+
+## Descripción
+
+`device_systems` se actualiza a una API segura, preparada para frontend, con protección de rutas, validaciones robustas y registro de actividad.
+
+Mantiene la gestión de usuarios, dispositivos y préstamos, agregando una capa de seguridad profesional.
+
+---
+
+## Tecnologías
 
 | Tecnología | Uso |
 |------------|-----|
-| Python 3.10+ | Lenguaje de programación |
-| FastAPI | Framework web para construir la API REST |
-| Uvicorn | Servidor ASGI para ejecutar la aplicación |
-| Pydantic v2 | Validación y serialización de datos |
-| Git / GitHub | Control de versiones y entrega del proyecto |
+| FastAPI | API REST, OpenAPI y autenticación OAuth2 |
+| SQLAlchemy | ORM y relaciones entre modelos |
+| Alembic | Migraciones de base de datos |
+| Pydantic v2 | Validaciones avanzadas de schemas |
+| passlib[bcrypt] | Hash seguro de contraseñas |
+| python-jose | Creación y verificación de JWT |
+| slowapi | Rate limiting |
+| python-dotenv | Variables de entorno |
+| SQLite | Base de datos local |
+| Uvicorn | Servidor ASGI |
 
 ---
 
@@ -39,448 +70,410 @@ La documentación interactiva se genera automáticamente con **Swagger UI** al e
 ```
 device_systems/
 ├── app/
-│   ├── main.py                 # Configuración inicial de FastAPI
+│   ├── main.py
+│   ├── limiter.py
+│   ├── core/
+│   │   └── config.py
+│   ├── auth/
+│   │   ├── auth_routes.py
+│   │   ├── auth_service.py
+│   │   └── security.py
+│   ├── database/
+│   │   └── connection.py
+│   ├── models/
+│   │   ├── user_model.py
+│   │   ├── device_model.py
+│   │   └── loan_model.py
 │   ├── schemas/
-│   │   └── user_schema.py      # Modelos Pydantic de entrada y salida
-│   └── routes/
-│       └── user_routes.py      # Endpoints GET y POST del recurso users
+│   │   ├── user_schema.py
+│   │   ├── device_schema.py
+│   │   ├── loan_schema.py
+│   │   └── auth_schema.py
+│   ├── routes/
+│   │   ├── user_routes.py
+│   │   ├── device_routes.py
+│   │   └── loan_routes.py
+│   ├── services/
+│   │   ├── user_service.py
+│   │   ├── device_service.py
+│   │   └── loan_service.py
+│   ├── dependencies/
+│   │   ├── database_dependency.py
+│   │   ├── auth_dependency.py
+│   │   └── user_dependencies.py
+│   └── middlewares/
+│       └── request_middleware.py
+├── alembic/
+│   └── versions/
+│       ├── 3281b01a7b06_create_devices_and_loans_tables.py
+│       └── f7a2c9e1b4d0_add_authentication_fields_to_users.py
+├── .env.example
+├── alembic.ini
 ├── requirements.txt
+├── test_ev11.py
 └── README.md
 ```
 
-### Organización del código
-
-- **`main.py`**: Crea la instancia de FastAPI, registra las rutas y expone el endpoint raíz `/`.
-- **`user_schema.py`**: Define los modelos `UserCreate` (entrada) y `UserResponse` (salida) con validaciones Pydantic.
-- **`user_routes.py`**: Contiene los endpoints HTTP, la base de datos simulada en memoria y la lógica de filtrado.
-
 ---
 
-## Modelos Pydantic
-
-### UserCreate (entrada – POST)
-
-| Campo | Tipo | Validación |
-|-------|------|------------|
-| `name` | string | Obligatorio, mínimo 3 caracteres |
-| `email` | EmailStr | Formato de correo válido |
-| `role` | string | Solo valores permitidos: `admin`, `support`, `user` |
-| `is_active` | boolean | Valor booleano (por defecto `true`) |
-
-### UserResponse (salida – GET y POST)
-
-| Campo | Tipo | Descripción |
-|-------|------|-------------|
-| `id` | int | Identificador único del usuario |
-| `name` | string | Nombre del usuario |
-| `email` | string | Correo electrónico |
-| `role` | string | Rol en el sistema |
-| `is_active` | boolean | Estado activo/inactivo |
-
-El `response_model` garantiza que la API solo exponga los campos definidos y oculte datos internos de la base de datos simulada.
-
----
-
-## Instalación de dependencias
+## Instalación
 
 ```bash
-# Clonar el repositorio
-git clone https://github.com/TU_USUARIO/device_systems.git
-cd device_systems
-
-# Crear entorno virtual
+git checkout device_systems_security
 python -m venv venv
-
-# Activar entorno virtual
-# Windows:
 venv\Scripts\activate
-# Linux / macOS:
-source venv/bin/activate
-
-# Instalar dependencias
 pip install -r requirements.txt
-```
-
-**Contenido de `requirements.txt`:**
-
-```
-fastapi>=0.115.0
-uvicorn[standard]>=0.30.0
-pydantic[email]>=2.0.0
+copy .env.example .env
 ```
 
 ---
 
-## Ejecución del servidor
+## Configuración de entorno
+
+Copia `.env.example` a `.env` y ajusta los valores:
+
+```env
+DATABASE_URL=sqlite:///./device_systems.db
+SECRET_KEY=cambia-esta-clave-secreta-en-producción
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+```
+
+---
+
+## Migraciones
+
+Actualizar la base de datos:
 
 ```bash
-uvicorn app.main:app --reload
+python -m alembic upgrade head
 ```
 
-| Recurso | URL |
-|---------|-----|
-| API | http://127.0.0.1:8000 |
-| Swagger UI | http://127.0.0.1:8000/docs |
-| ReDoc | http://127.0.0.1:8000/redoc |
+Generar migración nueva si es necesario:
 
----
-
-## Tabla de endpoints
-
-| Método | Ruta | Descripción | Código de éxito |
-|--------|------|-------------|-----------------|
-| GET | `/` | Información general de la API | 200 OK |
-| GET | `/users` | Listar todos los usuarios | 200 OK |
-| GET | `/users?role=admin` | Filtrar usuarios por rol | 200 OK |
-| GET | `/users?is_active=true` | Filtrar usuarios por estado activo | 200 OK |
-| GET | `/users/{user_id}` | Consultar un usuario por ID | 200 OK |
-| POST | `/users` | Registrar un nuevo usuario | 201 Created |
-
----
-
-## Cabeceras HTTP personalizadas
-
-Todas las respuestas del recurso `/users` incluyen las siguientes cabeceras:
-
-```
-X-App-Name: device_systems
-X-API-Version: 1.0
-```
-
-Estas cabeceras identifican la aplicación y la versión de la API en cada respuesta HTTP.
-
----
-
-## Ejemplos de peticiones y respuestas
-
-### GET /users – Listar todos los usuarios
-
-**Petición:**
-
-```http
-GET http://127.0.0.1:8000/users
-```
-
-**Respuesta `200 OK`:**
-
-```json
-[
-  {"id": 1, "name": "Ana Garcia",  "email": "ana@device.com",    "role": "admin",   "is_active": true},
-  {"id": 2, "name": "Luis Perez",  "email": "luis@device.com",   "role": "support", "is_active": true},
-  {"id": 3, "name": "Maria Lopez", "email": "maria@device.com",  "role": "user",    "is_active": false},
-  {"id": 4, "name": "Carlos Ruiz", "email": "carlos@device.com", "role": "user",    "is_active": true}
-]
+```bash
+python -m alembic revision --autogenerate -m "add authentication fields to users"
+python -m alembic upgrade head
 ```
 
 ---
 
-### GET /users?role=admin – Filtrar por rol (Query Parameter)
+## Ejecución
 
-**Petición:**
-
-```http
-GET http://127.0.0.1:8000/users?role=admin
+```bash
+python -m uvicorn app.main:app --reload
 ```
 
-**Respuesta `200 OK`:**
-
-```json
-[
-  {"id": 1, "name": "Ana Garcia", "email": "ana@device.com", "role": "admin", "is_active": true}
-]
-```
+- API: `http://127.0.0.1:8000`
+- Swagger: `http://127.0.0.1:8000/docs`
+- ReDoc: `http://127.0.0.1:8000/redoc`
 
 ---
 
-### GET /users?is_active=true – Filtrar por estado (Query Parameter)
+## Endpoints principales
 
-**Petición:**
-
-```http
-GET http://127.0.0.1:8000/users?is_active=true
-```
-
-**Respuesta `200 OK`:** Retorna solo los usuarios con `is_active` en `true`.
+- `/auth` — Autenticación y usuario actual
+- `/users` — Gestión de usuarios
+- `/devices` — Gestión de dispositivos
+- `/loans` — Gestión de préstamos
 
 ---
 
-### GET /users/{user_id} – Consultar por ID (Path Parameter)
+## Autenticación y autorización
 
-**Petición:**
+| Método | Ruta | Descripción | Límite |
+|--------|------|-------------|--------|
+| POST | `/auth/register` | Registra usuario con contraseña segura | 3/min |
+| POST | `/auth/login` | Login y token JWT | 5/min |
+| GET | `/auth/me` | Datos del usuario autenticado | — |
 
-```http
-GET http://127.0.0.1:8000/users/1
-```
+### Registro
 
-**Respuesta `200 OK`:**
+Ejemplo `POST /auth/register`:
 
 ```json
 {
-  "id": 1,
-  "name": "Ana Garcia",
-  "email": "ana@device.com",
-  "role": "admin",
-  "is_active": true
+  "name": "Juan Aprendiz",
+  "email": "juan@sena.edu.co",
+  "password": "Segura123",
+  "role": "user"
 }
 ```
 
-**Error `404 Not Found` (usuario inexistente):**
+### Login
+
+Enviar como `application/x-www-form-urlencoded`:
+
+```
+username=juan@sena.edu.co&password=Segura123
+```
+
+Respuesta esperada:
 
 ```json
 {
-  "detail": "Usuario 99 no encontrado"
+  "access_token": "<token_jwt>",
+  "token_type": "bearer"
 }
+```
+
+### Uso del token
+
+```
+Authorization: Bearer <access_token>
 ```
 
 ---
 
-### POST /users – Crear un nuevo usuario
+## Protección de rutas y permisos
 
-**Petición:**
+| Ruta | Protección |
+|------|------------|
+| GET `/users` | Usuario autenticado |
+| GET `/users/{user_id}` | Usuario autenticado |
+| POST `/devices` | Admin o support |
+| PUT `/devices/{device_id}` | Admin o support |
+| DELETE `/devices/{device_id}` | Admin |
+| POST `/loans` | Usuario autenticado |
+| PATCH `/loans/{loan_id}/return` | Admin o support |
+| GET `/loans/details` | Admin o support |
 
-```http
-POST http://127.0.0.1:8000/users
-Content-Type: application/json
+### Respuestas de seguridad
 
-{
-  "name": "Pedro Mora",
-  "email": "pedro@device.com",
-  "role": "user",
-  "is_active": true
-}
-```
-
-**Respuesta `201 Created`:**
-
-```json
-{
-  "id": 5,
-  "name": "Pedro Mora",
-  "email": "pedro@device.com",
-  "role": "user",
-  "is_active": true
-}
-```
+- `401 Unauthorized` — Token ausente o inválido
+- `403 Forbidden` — Usuario sin permisos suficientes
+- `429 Too Many Requests` — Límite de peticiones excedido
 
 ---
 
-## Evidencia de validaciones y errores
+## Validaciones de seguridad
 
-### Correo electrónico duplicado – `409 Conflict`
+Las contraseñas deben cumplir con los siguientes requisitos:
 
-**Petición:**
+- Mínimo 8 caracteres
+- Al menos una letra mayúscula
+- Al menos una letra minúscula
+- Al menos un número
+- Sin espacios en blanco
 
-```http
-POST http://127.0.0.1:8000/users
-Content-Type: application/json
-
-{
-  "name": "Pedro Duplicado",
-  "email": "ana@device.com",
-  "role": "user",
-  "is_active": true
-}
-```
-
-**Respuesta:**
-
-```json
-{
-  "detail": "El correo ana@device.com ya existe"
-}
-```
+El campo `hashed_password` no se retorna en los modelos de respuesta.
 
 ---
 
-### Nombre demasiado corto – `422 Unprocessable Entity`
+## CORS
 
-**Petición:**
+La API utiliza CORS en `app.main` con:
 
-```http
-POST http://127.0.0.1:8000/users
-Content-Type: application/json
+- `allow_origins` desde `CORS_ORIGINS`
+- `allow_credentials=True`
+- `allow_methods=["*"]`
+- `allow_headers=["*"]`
 
-{
-  "name": "Jo",
-  "email": "nuevo@device.com",
-  "role": "user",
-  "is_active": true
-}
-```
+### Nota importante
 
-**Respuesta (validación automática de Pydantic):**
-
-```json
-{
-  "detail": [
-    {
-      "type": "string_too_short",
-      "loc": ["body", "name"],
-      "msg": "String should have at least 3 characters",
-      "input": "Jo"
-    }
-  ]
-}
-```
+No es seguro usar `allow_origins=["*"]` en producción cuando `allow_credentials=True`. Esto permite que cualquier dominio envíe peticiones con credenciales, lo que puede exponer la API a ataques CSRF y sesiones maliciosas. En producción se deben autorizar solo los dominios del frontend confiable.
 
 ---
 
-### Rol no permitido – `422 Unprocessable Entity`
+## Middleware personalizado
 
-**Petición:**
+Cada respuesta incluye cabeceras adicionales:
 
-```http
-POST http://127.0.0.1:8000/users
-Content-Type: application/json
+- `X-App-Name: device_systems`
+- `X-Process-Time` (tiempo de respuesta en segundos)
+- `X-Request-ID` (id de petición)
 
-{
-  "name": "Usuario Test",
-  "email": "test@device.com",
-  "role": "superadmin",
-  "is_active": true
-}
-```
-
-**Respuesta:**
-
-```json
-{
-  "detail": [
-    {
-      "type": "literal_error",
-      "loc": ["body", "role"],
-      "msg": "Input should be 'admin', 'support' or 'user'"
-    }
-  ]
-}
-```
+Además, el middleware registra método, ruta, estado y tiempo de ejecución.
 
 ---
 
-### Correo con formato inválido – `422 Unprocessable Entity`
+## Rate limiting
 
-**Petición:**
+Reglas configuradas:
 
-```http
-POST http://127.0.0.1:8000/users
-Content-Type: application/json
+- `POST /auth/login` → 5 solicitudes por minuto
+- `POST /auth/register` → 3 solicitudes por minuto
+- `GET /users` → 30 solicitudes por minuto
+- `POST /loans` → 10 solicitudes por minuto
 
-{
-  "name": "Usuario Test",
-  "email": "correo-invalido",
-  "role": "user",
-  "is_active": true
-}
+Cuando se supera el límite, la API devuelve `429 Too Many Requests`.
+
+---
+
+## Datos de prueba
+
+Contraseña de seed para usuarios iniciales:
+
+- `Admin1234`
+
+Usuarios de ejemplo creados automáticamente:
+
+- `ana@device.com` → `admin`
+- `luis@device.com` → `support`
+- `carlos@device.com` → `user`
+
+---
+
+## Documentación y evidencia
+
+- Swagger/OpenAPI: `/docs`
+- ReDoc: `/redoc`
+- Imágenes y capturas: `docs/imagenes/EV11`
+
+---
+
+## Buenas prácticas aplicadas
+
+- Hash seguro de contraseñas con `passlib[bcrypt]`
+- Autenticación OAuth2 con JWT
+- Rutas protegidas con dependencias de seguridad
+- Validaciones robustas con Pydantic v2
+- CORS limitado a orígenes autorizados
+- Rate limiting para endpoints sensibles
+- Separación clara entre `routes`, `services`, `schemas`, `dependencies` y `middlewares`
+
+---
+
+## Resumen
+
+Esta entrega muestra una API `device_systems` segura y lista para frontend: autenticación, autorización por roles, middleware personalizado, CORS ajustado, rate limiting y validaciones avanzadas.
+
+---
+
+## Validación de contraseña (Pydantic v2)
+
+- Mínimo 8 caracteres
+- Al menos una mayúscula
+- Al menos una minúscula
+- Al menos un número
+- Sin espacios en blanco
+
+El campo `hashed_password` **nunca** se expone en los schemas de respuesta.
+
+---
+
+## CORS
+
+Configurado en `main.py` para desarrollo:
+
+```python
+allow_origins=["http://localhost:5173", "http://localhost:3000"]
+allow_credentials=True
+allow_methods=["*"]
+allow_headers=["*"]
 ```
 
-**Respuesta:**
+### ¿Por qué no usar `"*"` en producción con credenciales?
 
-```json
-{
-  "detail": [
-    {
-      "type": "value_error",
-      "loc": ["body", "email"],
-      "msg": "value is not a valid email address"
-    }
-  ]
-}
+Cuando `allow_credentials=True`, el navegador envía cookies y cabeceras de autorización. Si `allow_origins` es `"*"`, cualquier sitio web podría hacer peticiones autenticadas a la API desde el navegador del usuario (ataques CSRF cross-origin). En producción se deben listar **explícitamente** los dominios del frontend autorizados.
+
+---
+
+## Middleware personalizado
+
+Cada respuesta incluye:
+
+| Cabecera | Ejemplo |
+|----------|---------|
+| `X-App-Name` | `device_systems` |
+| `X-Process-Time` | `0.0042` |
+| `X-Request-ID` | `8f42e9c1` |
+
+También registra en log: método, ruta, código HTTP y tiempo de procesamiento.
+
+---
+
+## Rate limiting
+
+| Endpoint | Límite |
+|----------|--------|
+| POST `/auth/login` | 5/min |
+| POST `/auth/register` | 3/min |
+| GET `/users` | 30/min |
+| POST `/loans` | 10/min |
+
+Respuesta al exceder límite: **429 Too Many Requests**
+
+---
+
+## Variables de entorno (`.env`)
+
+```env
+DATABASE_URL=sqlite:///./device_systems.db
+SECRET_KEY=cambia-esta-clave-secreta-en-produccion
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 ```
 
 ---
 
 ## Pruebas funcionales
 
-La API fue probada desde:
+```bash
+pip install httpx
+python test_ev11.py
+```
 
-- **Swagger UI** → http://127.0.0.1:8000/docs
-- **Postman / Thunder Client** → peticiones HTTP manuales
+Escenarios cubiertos:
 
-### Checklist de pruebas
-
-| Prueba | Resultado |
-|--------|-----------|
-| GET /users – listar usuarios | ✅ |
-| GET /users?role=admin – filtrar por rol | ✅ |
-| GET /users?is_active=false – filtrar por estado | ✅ |
-| GET /users/1 – consultar por ID | ✅ |
-| GET /users/99 – usuario inexistente (404) | ✅ |
-| POST /users – crear usuario válido (201) | ✅ |
-| POST /users – correo duplicado (409) | ✅ |
-| POST /users – datos inválidos (422) | ✅ |
-
----
-
-## Capturas de Swagger UI
-
-> **Instrucciones:** Ejecutar el servidor y tomar las capturas desde http://127.0.0.1:8000/docs
-
-### Vista general de la API
-
-![Swagger UI - Vista general](docs/imagenes/swagger_vista_general.png)
-
-Vista principal de Swagger UI con los endpoints GET y POST del recurso Users.
+1. Registro de usuario
+2. Registro con contraseña débil (422)
+3. Registro con email duplicado (400)
+4. Login correcto
+5. Login con contraseña incorrecta (401)
+6. Consulta `/auth/me`
+7. Acceso sin token (401)
+8. Acceso con token inválido (401)
+9. Usuario sin permisos (403)
+10. Creación de dispositivo con rol permitido
+11. Eliminación con rol no permitido (403)
+12. CORS preflight
+13. Cabeceras del middleware
+14. Activación de rate limiting (429)
+15. Swagger/OpenAPI con OAuth2
 
 ---
 
-### GET /users
+## Capturas (evidencias)
 
-![Swagger UI - GET /users](docs/imagenes/swagger_get_users.png)
+> Agrega tus capturas en `docs/imagenes/` con los nombres sugeridos.
 
-Listado de usuarios con respuesta **200 OK**.
-
----
-
-### GET /users/{user_id}
-
-Consulta por ID con respuesta **200 OK** (`user_id = 1`):
-
-![Swagger UI - GET /users/1](docs/imagenes/swagger_get_user_id.png)
-
-Usuario inexistente con respuesta **404 Not Found** (`user_id = 99`):
-
-![Swagger UI - GET /users/99 error 404](docs/imagenes/swagger_get_user_id_404.png)
-
----
-
-### POST /users
-
-![Swagger UI - POST /users](docs/imagenes/swagger_post_users.png)
-
-Creación de usuario con respuesta **201 Created**.
+| Evidencia | Archivo sugerido |
+|-----------|------------------|
+| Estructura del proyecto | `estructura_proyecto_ev11.png` |
+| Migración Alembic aplicada | `alembic_upgrade_ev11.png` |
+| Registro de usuario | `auth_register_ev11.png` |
+| Login y token JWT | `auth_login_ev11.png` |
+| GET `/auth/me` | `auth_me_ev11.png` |
+| Acceso sin token (401) | `auth_sin_token_ev11.png` |
+| Acceso sin permisos (403) | `auth_sin_rol_ev11.png` |
+| Swagger con OAuth2 | `swagger_oauth2_ev11.png` |
+| Cabeceras middleware | `middleware_headers_ev11.png` |
+| Rate limiting (429) | `rate_limit_ev11.png` |
 
 ---
 
-### Validaciones y errores en Swagger
+## Ramas
 
-![Swagger UI - Correo duplicado 409](docs/imagenes/swagger_errores.png)
-
-Correo electrónico duplicado con respuesta **409 Conflict**.
-
----
-
-## Reflexión sobre el uso de FastAPI
-
-FastAPI facilita la construcción de APIs REST de forma rápida, segura y bien documentada. En este proyecto se aplicaron los siguientes conceptos:
-
-**Organización del proyecto:** Se separó la configuración (`main.py`), los modelos de datos (`schemas/`) y las rutas (`routes/`) para mantener el código ordenado y fácil de mantener.
-
-**Pydantic v2:** Los modelos `UserCreate` y `UserResponse` validan automáticamente los datos de entrada y estandarizan las respuestas. Si el cliente envía datos incorrectos (nombre corto, correo inválido, rol no permitido), FastAPI responde con código `422` y un detalle claro del error, sin necesidad de escribir validaciones manuales.
-
-**Path Parameters:** El endpoint `GET /users/{user_id}` permite consultar un usuario específico pasando su ID en la URL.
-
-**Query Parameters:** Los endpoints `GET /users?role=admin` y `GET /users?is_active=true` demuestran cómo filtrar resultados sin modificar la estructura de la ruta.
-
-**Response Models:** Al declarar `response_model=UserResponse`, la API garantiza que solo se expongan los campos definidos, protegiendo la estructura interna de los datos.
-
-**Cabeceras HTTP:** Las cabeceras `X-App-Name` y `X-API-Version` permiten identificar la aplicación en cada respuesta, una práctica común en APIs profesionales.
-
-**Documentación automática:** Swagger UI se genera sin configuración adicional, lo que permite probar todos los endpoints directamente desde el navegador.
-
-En conclusión, FastAPI combina simplicidad, validación robusta y documentación automática, lo que lo convierte en una excelente opción para desarrollar APIs REST desde los fundamentos.
+| Rama | Contenido |
+|------|-----------|
+| `main` | EV07 – GET/POST |
+| `ev08` | CRUD en memoria |
+| `ev09` | SQLAlchemy + SQLite |
+| `device_systems_alembic_relaciones` | EV10 – Alembic, relaciones, joins |
+| `device_systems_security` | EV11 – OAuth2, JWT, CORS, rate limiting |
 
 ---
 
-## Presentación en Video device_systems
+## Reflexión final
 
-**Video:**  https://youtu.be/mkzmeL9gkE4?si=K_5rLnpY6PTPtQUw
+La seguridad en APIs REST no es opcional: proteger credenciales con hash, validar tokens JWT, restringir operaciones por rol, limitar peticiones abusivas y configurar CORS de forma explícita son prácticas fundamentales antes de exponer una API a clientes frontend o servicios externos. Esta actividad transforma `device_systems` de una API funcional a una API **profesional y protegida**.
+
+---
+
+## Video
+
+(https://youtu.be/JJVVAE0Jgzo?si=M2Wnvyiy-VEP7ZU0)
+
